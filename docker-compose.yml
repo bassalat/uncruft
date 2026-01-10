@@ -1,0 +1,41 @@
+# docker-compose.yml - Development environment for uncruft
+
+services:
+  # Interactive development shell
+  dev:
+    build: .
+    volumes:
+      - .:/app
+      - ./tests/fixtures:/test-fixtures
+    working_dir: /app
+    command: bash
+    stdin_open: true
+    tty: true
+
+  # Run tests
+  test:
+    build: .
+    volumes:
+      - .:/app
+    command: pytest -v --cov=uncruft --cov-report=term-missing
+
+  # Run linter
+  lint:
+    build: .
+    volumes:
+      - .:/app
+    command: ruff check src tests
+
+  # Format code
+  format:
+    build: .
+    volumes:
+      - .:/app
+    command: ruff format src tests
+
+  # Run the CLI (for quick testing)
+  cli:
+    build: .
+    volumes:
+      - .:/app
+    entrypoint: ["uncruft"]

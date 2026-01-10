@@ -1,0 +1,125 @@
+/* Main application styles for uncruft TUI */
+
+Screen {
+    layout: vertical;
+}
+
+/* Main container layout */
+#main-container {
+    layout: vertical;
+    height: 100%;
+}
+
+#disk-bar {
+    height: 5;
+    padding: 1;
+    background: $surface;
+    border-bottom: solid $primary;
+}
+
+#content {
+    layout: horizontal;
+    height: 1fr;
+}
+
+/* Left panel - category list */
+#left-panel {
+    width: 60%;
+    height: 100%;
+    border-right: solid $primary;
+}
+
+#cat-header {
+    height: 1;
+    padding: 0 1;
+    background: $primary;
+    color: $text;
+}
+
+#category-table {
+    height: 1fr;
+}
+
+#selection-info {
+    height: 1;
+    padding: 0 1;
+    background: $surface;
+    border-top: solid $primary-darken-1;
+}
+
+/* Right panel - details */
+#right-panel {
+    width: 40%;
+    height: 100%;
+    padding: 1;
+}
+
+#category-detail {
+    height: 100%;
+    padding: 1;
+    background: $surface;
+    border: solid $primary-darken-2;
+}
+
+/* Cleanup screen */
+#cleanup-container {
+    layout: vertical;
+    align: center middle;
+    padding: 2;
+}
+
+#cleanup-title {
+    text-align: center;
+    padding: 1;
+}
+
+#cleanup-table {
+    height: auto;
+    max-height: 50%;
+    margin: 1;
+}
+
+#cleanup-total {
+    text-align: center;
+    padding: 1;
+}
+
+#cleanup-buttons {
+    layout: horizontal;
+    align: center middle;
+    height: auto;
+    padding: 1;
+}
+
+#cleanup-buttons Button {
+    margin: 0 2;
+}
+
+#cleanup-status {
+    text-align: center;
+    padding: 1;
+}
+
+/* Button styles */
+Button {
+    min-width: 12;
+}
+
+Button.success {
+    background: $success;
+}
+
+/* DataTable styling */
+DataTable {
+    height: 1fr;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary;
+    color: $text;
+}
+
+DataTable > .datatable--header {
+    background: $surface;
+    text-style: bold;
+}
