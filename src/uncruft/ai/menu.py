@@ -2,6 +2,7 @@
 
 import json
 import os
+import shlex
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
@@ -673,7 +674,27 @@ class MenuSession:
         for item in safe_items:
             self.console.print(f"  - {item['name']}: {item['size_human']}")
 
-        if not self._confirm("Clean all these items?"):
+        # Build commands for each category
+        from uncruft.categories import get_category
+
+        commands = []
+        for item in safe_items:
+            cat = get_category(item["category_id"])
+            if cat and cat.cleanup_command:
+                commands.append(cat.cleanup_command)
+            elif item.get("path"):
+                commands.append(f"rm -rf {shlex.quote(item['path'])}")
+
+        # Show commands (limit display if many)
+        if commands:
+            if len(commands) <= 3:
+                cmd = " && ".join(commands)
+            else:
+                cmd = " && ".join(commands[:2]) + f" && ... ({len(commands)} commands total)"
+        else:
+            cmd = None
+
+        if not self._confirm("Clean all these items?", command=cmd):
             return
 
         # Clean each category
@@ -721,7 +742,27 @@ class MenuSession:
         for item in to_clean:
             self.console.print(f"  - {item['name']}: {item['size_human']}")
 
-        if not self._confirm("Clean these items?"):
+        # Build commands for selected categories
+        from uncruft.categories import get_category
+
+        commands = []
+        for item in to_clean:
+            cat = get_category(item["category_id"])
+            if cat and cat.cleanup_command:
+                commands.append(cat.cleanup_command)
+            elif item.get("path"):
+                commands.append(f"rm -rf {shlex.quote(item['path'])}")
+
+        # Show commands (limit display if many)
+        if commands:
+            if len(commands) <= 3:
+                cmd = " && ".join(commands)
+            else:
+                cmd = " && ".join(commands[:2]) + f" && ... ({len(commands)} commands total)"
+        else:
+            cmd = None
+
+        if not self._confirm("Clean these items?", command=cmd):
             return
 
         result = self.tools.execute("clean_multiple", {"category_ids": category_ids})
@@ -1381,7 +1422,8 @@ Available cleanup categories:
         image_id = image.get("id", "")
         size = self._format_bytes(image.get("size_bytes", 0))
 
-        if not self._confirm(f"Delete {repo}:{tag} ({size})?"):
+        cmd = f"docker rmi {image_id}"
+        if not self._confirm(f"Delete {repo}:{tag} ({size})?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_item
@@ -1422,7 +1464,8 @@ Available cleanup categories:
         name = container.get("name", "unknown")
         container_id = container.get("id", "")
 
-        if not self._confirm(f"Delete container {name}?"):
+        cmd = f"docker rm {container_id}"
+        if not self._confirm(f"Delete container {name}?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_item
@@ -1462,7 +1505,8 @@ Available cleanup categories:
 
         name = volume.get("name", "unknown")
 
-        if not self._confirm(f"Delete volume {name}?"):
+        cmd = f"docker volume rm {name}"
+        if not self._confirm(f"Delete volume {name}?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_item
@@ -1478,7 +1522,8 @@ Available cleanup categories:
 
     def _do_docker_prune_all(self) -> None:
         """Prune all unused Docker items."""
-        if not self._confirm("Remove all unused Docker images, containers, and volumes?"):
+        cmd = "docker system prune -f"
+        if not self._confirm("Remove all unused Docker images, containers, and volumes?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_unused
@@ -1498,7 +1543,8 @@ Available cleanup categories:
 
     def _do_docker_prune_images(self) -> None:
         """Prune unused Docker images."""
-        if not self._confirm("Remove all unused Docker images?"):
+        cmd = "docker image prune -f"
+        if not self._confirm("Remove all unused Docker images?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_unused
@@ -1516,7 +1562,8 @@ Available cleanup categories:
 
     def _do_docker_prune_dangling(self) -> None:
         """Prune dangling Docker images."""
-        if not self._confirm("Remove all dangling (untagged) images?"):
+        cmd = "docker image prune -f"
+        if not self._confirm("Remove all dangling (untagged) images?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_unused
@@ -1534,7 +1581,8 @@ Available cleanup categories:
 
     def _do_docker_prune_containers(self) -> None:
         """Prune stopped Docker containers."""
-        if not self._confirm("Remove all stopped containers?"):
+        cmd = "docker container prune -f"
+        if not self._confirm("Remove all stopped containers?", command=cmd):
             return
 
         from uncruft.cleaner import delete_docker_unused
@@ -1594,7 +1642,9 @@ Available cleanup categories:
         path = project.get("project_path", "")
         size = self._format_bytes(project.get("size_bytes", 0))
 
-        if not self._confirm(f"Delete node_modules for {name} ({size})?"):
+        nm_path = os.path.join(path, "node_modules")
+        cmd = f"rm -rf {shlex.quote(nm_path)}"
+        if not self._confirm(f"Delete node_modules for {name} ({size})?", command=cmd):
             return
 
         from uncruft.cleaner import delete_node_modules_project
@@ -1612,8 +1662,22 @@ Available cleanup categories:
     def _do_delete_inactive_node_modules(self, projects: list[dict]) -> None:
         """Delete node_modules for all inactive projects."""
         total_size = sum(p.get("size_bytes", 0) for p in projects)
+
+        # Build commands for each project
+        commands = []
+        for proj in projects:
+            nm_path = os.path.join(proj.get("project_path", ""), "node_modules")
+            commands.append(f"rm -rf {shlex.quote(nm_path)}")
+
+        # Show first few commands if many
+        if len(commands) <= 3:
+            cmd = " && ".join(commands)
+        else:
+            cmd = " && ".join(commands[:2]) + f" && ... ({len(commands)} total)"
+
         if not self._confirm(
-            f"Delete node_modules for {len(projects)} inactive projects ({self._format_bytes(total_size)})?"
+            f"Delete node_modules for {len(projects)} inactive projects ({self._format_bytes(total_size)})?",
+            command=cmd,
         ):
             return
 
@@ -1658,7 +1722,8 @@ Available cleanup categories:
         path = app.get("path", "")
         size = self._format_bytes(app.get("size_bytes", 0))
 
-        if not self._confirm(f"Delete cache for {name} ({size})?"):
+        cmd = f"rm -rf {shlex.quote(path)}"
+        if not self._confirm(f"Delete cache for {name} ({size})?", command=cmd):
             return
 
         from uncruft.cleaner import delete_app_cache
@@ -1676,8 +1741,23 @@ Available cleanup categories:
     def _do_delete_browser_caches(self, browsers: list[dict]) -> None:
         """Delete all browser caches."""
         total_size = sum(b.get("size_bytes", 0) for b in browsers)
+
+        # Build commands for each browser
+        commands = []
+        for browser in browsers:
+            path = browser.get("path", "")
+            if path:
+                commands.append(f"rm -rf {shlex.quote(path)}")
+
+        # Show first few commands if many
+        if len(commands) <= 3:
+            cmd = " && ".join(commands)
+        else:
+            cmd = " && ".join(commands[:2]) + f" && ... ({len(commands)} total)"
+
         if not self._confirm(
-            f"Delete cache for {len(browsers)} browsers ({self._format_bytes(total_size)})?"
+            f"Delete cache for {len(browsers)} browsers ({self._format_bytes(total_size)})?",
+            command=cmd,
         ):
             return
 
@@ -1841,11 +1921,28 @@ If no match, respond with []"""
         self.console.print(f"[yellow]Couldn't match '{user_input}'. Try a number or exact name.[/yellow]")
         return []
 
-    def _confirm(self, message: str) -> bool:
-        """Ask for confirmation."""
+    def _show_command(self, command: str, description: str = "") -> None:
+        """Display a terminal command for manual execution."""
+        if description:
+            self.console.print(f"\n[dim]{description}[/dim]")
+
+        panel = Panel(
+            f"[bold white]{command}[/bold white]",
+            title="[cyan]Run this command[/cyan]",
+            border_style="cyan",
+            padding=(0, 2),
+        )
+        self.console.print(panel)
+        self.console.print("[dim]Copy and paste into your terminal[/dim]")
+
+    def _confirm(self, message: str, command: str | None = None) -> bool:
+        """Ask for confirmation. In manual mode, shows the command instead of executing."""
         if self.manual_mode:
             self.console.print(f"\n[cyan]{message}[/cyan]")
-            self.console.print("[dim]Manual mode: skipping execution[/dim]")
+            if command:
+                self._show_command(command)
+            else:
+                self.console.print("[dim]Manual mode: skipping execution[/dim]")
             return False
 
         if self.dry_run:
